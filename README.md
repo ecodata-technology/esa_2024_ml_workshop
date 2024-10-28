@@ -1,5 +1,5 @@
 # End-to-end ML in Tidymodels
-# A workshop presented at Entomology 2024 by Dr Alex Blake at EcoData Technology
+A workshop presented at Entomology 2024 by Dr Alex Blake at EcoData Technology.
 
 This repository contains the scripts and data for the end-to-end ML workshop. Slides from the workshop [can be found here](https://docs.google.com/presentation/d/1P3-2T8LrT9P6-8NySUlR5pAs92zJkXB1OJgRc6wiKhI/edit?usp=sharing).
 
