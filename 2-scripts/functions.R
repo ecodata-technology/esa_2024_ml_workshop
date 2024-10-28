@@ -102,7 +102,7 @@ aggregate_pest_data <- function(pests, polygons) {
     # match pest CRS to county shapefile CRS
     st_transform(crs=4269) %>%
     st_join(polygons) %>%
-    # some dodgy entries don't match to county, we'll just exclude them for this demo but normally we'd want to investigate and potentially fix
+    # some entries appear to come from outside PA, we'll just exclude them for this demo but normally we'd want to investigate
     filter(!is.na(county)) %>%
     as.data.frame() %>%
     group_by(year, county) %>%
@@ -112,6 +112,8 @@ aggregate_pest_data <- function(pests, polygons) {
 }
 
 # b. Map PRISM raster to county polygons with zonal statistics from exactextractr package
+
+# Due to how PRISM data is structured we have to process each year-variable combination separately and collate the results
 wrangle_prism <- function(prism_directory, counties) {
   
   datasets = expand_grid(year = c(2014:2022), var = c('ppt', 'tmin', 'tmax'))

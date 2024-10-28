@@ -26,6 +26,7 @@ pest_agg = aggregate_pest_data(pest, counties)
 
 climate_agg = wrangle_prism("1-data/prism/", counties)
 
+# Combine everything for all years and counties
 cleaned_dat = expand_grid(year = c(2014:2023), county = counties$county) %>%
   left_join(pest_agg) %>%
   left_join(climate_agg) %>%
@@ -35,6 +36,8 @@ cleaned_dat = expand_grid(year = c(2014:2023), county = counties$county) %>%
 
 #### 4. Feature engineering ####
 
+# Derive some new predictors from the data we have:
+# Presence/absence (by county), mean temperature, county centroid lat/longs, neighbouring county detections, and of course our response variable
 final_dat = cleaned_dat %>%
   mutate(
     detections = coalesce(detections,0),
@@ -51,7 +54,8 @@ final_dat = cleaned_dat %>%
   ungroup() %>%
   filter(year < 2023)
 
-# final_dat = read.csv(final_dat, '1-data/finaldat.csv')
+# Final data has been prepared just in case of issues running prior code during the workshop
+# final_dat = read.csv('1-data/finaldat.csv')
 
 #### 5. Model Spec and CV ####
 
@@ -71,27 +75,29 @@ test_train_dat = final_dat %>% filter(year < 2022)
 
 # b. Get test-train split and class ratio
 
+# Set all of 2021 aside as test set, and figure out what proportion of the data this represents to do a time_split - prevents random mixing of dates in test/train split
 prop = nrow(test_train_dat %>% filter(year==2021))/nrow(test_train_dat)
 dat_split = initial_time_split(test_train_dat, prop=1-prop)
 
+# Weight 'detection' vs 'no detection' based on ratio of the two in the training set
 n_training = training(dat_split) %$% table(presence_t1)
 class_ratio = as.numeric(n_training[2]/n_training[1])
 
 
 # c. Specify recipe
 
-recipe = recipes::recipe(presence_t1 ~ ., data = training(dat_split)) %>% # shouldnt matter what dataset goes in here, it just catalogues the column names etc
+# Define the model along with any pre-processing steps that should be applied the same way for any future data passed through the model, and single out ID columns that aren't for fitting
+recipe = recipes::recipe(presence_t1 ~ ., data = training(dat_split)) %>%
   step_dummy(presence) %>%
-  update_role(county, new_role='ID') # exclude a couple of variables (but leave them in the dataframe)
+  update_role(county, new_role='ID')
 
 
 # d. Specify model and designate hyperparameters for tuning
 
+# Specify as an XGBoost model in classification mode, flag which hyperparameters will be tuned in CV
 xgb_model =
-  # specify that the model is XGBoost
   parsnip::boost_tree(
-    trees = tune(), #add to tuning
-    # Weight in favour of the minority ()
+    trees = tune(),
     mtry = tune(),
     sample_size = tune(),
     min_n = tune(),
@@ -99,12 +105,14 @@ xgb_model =
     learn_rate = tune(),
     loss_reduction = tune()
   ) %>%
-  set_engine("xgboost", scale_pos_weight := !!class_ratio) %>%
+  # The bang bang (rlang) operator is necessary to correctly evaluate the value of the variable during model training
+  set_engine("xgboost", scale_pos_weight = !!class_ratio) %>%
   set_mode("classification")
 
 
 # e. Define workflow
 
+# Workflow defines each component of the final fitted/production model
 xgb_workflow = workflows::workflow() %>%
   # add the model
   add_model(xgb_model) %>%
@@ -114,16 +122,18 @@ xgb_workflow = workflows::workflow() %>%
 
 # f. Set up values for hyperparameter tuning
 
+# Most XGBoost hyperparameters don't require user input for starting values
 xgboost_params = dials::parameters(
   trees(),
   finalize(mtry(), training(dat_split)),
-  sample_size=sample_prop(),
+  sample_size = sample_prop(),
   min_n(),
   tree_depth(),
   learn_rate(),
   loss_reduction()
 )
 
+# Generate a grid of 60 hyperparameter sets
 xgboost_grid = dials::grid_max_entropy(
   xgboost_params, 
   size = 60
@@ -132,8 +142,10 @@ xgboost_grid = dials::grid_max_entropy(
 
 # g. Run cross validation
 
+# Specify 5-fold cross validation
 cv_folds = vfold_cv(training(dat_split),v=5)
 
+# Run with ANOVA racing to speed things up
 xgb_tuned = finetune::tune_race_anova(
   object=xgb_workflow,
   resamples = cv_folds,
@@ -146,8 +158,10 @@ xgb_tuned = finetune::tune_race_anova(
 
 # h. Examine results and extract the best parameter set to finalize the model
 
+# We'll use ROC AUC as our target metric - choice depends on priorities for model performance
 xgb_tuned %>% tune::show_best(metric="roc_auc")
 
+# Finalize the workflow with best set of hyperparameters
 param_final = xgb_tuned %>% tune::select_best(metric="roc_auc")
 xgb_final = xgb_workflow %>% finalize_workflow(param_final)
 
@@ -186,6 +200,7 @@ preds = new_dat %>% mutate(pred = predict(extract_workflow(xgb_fit),.,type="raw"
 
 pacman::p_load(ggplot2, shapviz)
 
+# Re-add county polygons
 preds_sf = preds %>% left_join(counties)
 
 
@@ -204,8 +219,10 @@ preds_sf %>% ggplot(aes(fill=pred, geometry=geometry)) +
   theme_void() +
   theme(
     legend.justification.inside=c(.9,1),
-    legend.direction="horizontal"
+    legend.direction="horizontal",
+    plot.background=element_rect(fill="white", colour=NA)
   )
+ggsave('3-outputs/probability_map.png', width=6, height=3)
 
 # And map the confusion matrix
 preds_sf %>% ggplot(aes(fill=result, geometry=geometry)) +
@@ -220,23 +237,41 @@ preds_sf %>% ggplot(aes(fill=result, geometry=geometry)) +
   theme_void() +
   theme(
     legend.justification.inside=c(.9,1),
-    legend.direction="horizontal"
+    legend.direction="horizontal",
+    plot.background=element_rect(fill="white", colour=NA)
   )
+ggsave('3-outputs/confusion_map.png', width=6, height=3)
 
 
 # c. Feature importance/SHAP
 
+# Feed in all data to understand at a high level which predictors are driving model outputs
 final_model = fit(xgb_final, final_dat)
 xgb_obj = pull_workflow_fit(final_model)$fit
 
+# Generate SHAP values
 shap = shapviz(xgb_obj,
                X_pred = bake(prep(recipe), has_role("predictor"), new_data = final_dat, composition = "matrix"),
                X = bake(prep(recipe), has_role("predictor"), new_data = final_dat),
+               
+               # VERY slow to crunch for bigger datasets
                interactions = T
                )
 
+# Waterfall plots to interrogate individual observations
+sv_waterfall(shap, row_id = 12)
+ggsave('3-outputs/shap_waterfall.png', width=6, height=8)
+
+# Importance plots average over all observations
 sv_importance(shap)
+ggsave('3-outputs/shap_importance.png', width=6, height=8)
+
 sv_importance(shap, kind = "beeswarm")
+ggsave('3-outputs/shap_beeswarm.png', width=8, height=8)
+
+# Zoom in on individual features to see the non-linearities
 sv_dependence(shap, v = c("neighbour_detections","tot_population","detections","med_income"))
-sv_interaction(shap)
-sv_dependence(shap, v = 'county_x', interactions=T)
+
+# Examine top interactions between two features
+sv_dependence(shap, v = 'year', interactions=T)
+ggsave('3-outputs/shap_interaction.png', width=8, height=6)
