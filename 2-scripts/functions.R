@@ -33,7 +33,7 @@ pull_pest_data <- function() {
     inat = inat %>% rbind(temp)
   }
   
-  write.csv(inat, "1-data/inat.csv", row.names = F)
+  write.csv(inat, here::here('1-data','inat.csv'), row.names = F)
   
   return(inat)
   
@@ -53,13 +53,13 @@ pull_county_data <- function() {
 pull_prism_data <- function() {
   
   # precipitation
-  prism_set_dl_dir('1-data/prism/ppt'); get_prism_annual(type = 'ppt', years = c(2014:2022), keepZip=F)
+  prism_set_dl_dir(here::here('1-data','prism','ppt')); get_prism_annual(type = 'ppt', years = c(2014:2022), keepZip=F)
   
   # tmin
-  prism_set_dl_dir('1-data/prism/tmin'); get_prism_annual(type = 'tmin', years = c(2014:2022), keepZip=F)
+  prism_set_dl_dir(here::here('1-data','prism','tmin')); get_prism_annual(type = 'tmin', years = c(2014:2022), keepZip=F)
   
   # tmax
-  prism_set_dl_dir('1-data/prism/tmax'); get_prism_annual(type = 'tmax', years = c(2014:2022), keepZip=F)
+  prism_set_dl_dir(here::here('1-data','prism','tmax')); get_prism_annual(type = 'tmax', years = c(2014:2022), keepZip=F)
   
 }
 

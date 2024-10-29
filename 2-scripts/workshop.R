@@ -1,7 +1,11 @@
 
 #### 1. Setup ####
 
-source('2-scripts/functions.R')
+# Dealing with different OS filepathing
+if (!require("here")) {install.packages("here")}
+here::i_am('2-scripts/workshop.R')
+
+source(here::here('2-scripts', 'functions.R'))
 
 
 
@@ -9,7 +13,7 @@ source('2-scripts/functions.R')
 
 # This is a little slow, so we've already pulled the data
 # pest = pull_pest_data()
-pest = read.csv("1-data/inat.csv")
+pest = read.csv(here::here('1-data','inat.csv'))
 
 counties = pull_county_data()
 
@@ -24,7 +28,7 @@ census = pull_census_data()
 
 pest_agg = aggregate_pest_data(pest, counties)
 
-climate_agg = wrangle_prism("1-data/prism/", counties)
+climate_agg = wrangle_prism(here::here('1-data','prism'), counties)
 
 # Combine everything for all years and counties
 cleaned_dat = expand_grid(year = c(2014:2023), county = counties$county) %>%
@@ -55,7 +59,7 @@ final_dat = cleaned_dat %>%
   filter(year < 2023)
 
 # Final data has been prepared just in case of issues running prior code during the workshop
-# final_dat = read.csv('1-data/finaldat.csv')
+# final_dat = read.csv(here::here('1-data','finaldat.csv'))
 
 #### 5. Model Spec and CV ####
 
@@ -222,7 +226,7 @@ preds_sf %>% ggplot(aes(fill=pred, geometry=geometry)) +
     legend.direction="horizontal",
     plot.background=element_rect(fill="white", colour=NA)
   )
-ggsave('3-outputs/probability_map.png', width=6, height=3)
+ggsave(here::here('3-outputs','probability_map.png'), width=6, height=3)
 
 # And map the confusion matrix
 preds_sf %>% ggplot(aes(fill=result, geometry=geometry)) +
@@ -240,7 +244,7 @@ preds_sf %>% ggplot(aes(fill=result, geometry=geometry)) +
     legend.direction="horizontal",
     plot.background=element_rect(fill="white", colour=NA)
   )
-ggsave('3-outputs/confusion_map.png', width=6, height=3)
+ggsave(here::here('3-outputs','confusion_map.png'), width=6, height=3)
 
 
 # c. Feature importance/SHAP
@@ -260,18 +264,18 @@ shap = shapviz(xgb_obj,
 
 # Waterfall plots to interrogate individual observations
 sv_waterfall(shap, row_id = 12)
-ggsave('3-outputs/shap_waterfall.png', width=6, height=8)
+ggsave(here::here('3-outputs','shap_waterfall.png'), width=6, height=8)
 
 # Importance plots average over all observations
 sv_importance(shap)
-ggsave('3-outputs/shap_importance.png', width=6, height=8)
+ggsave(here::here('3-outputs','shap_importance.png'), width=6, height=8)
 
 sv_importance(shap, kind = "beeswarm")
-ggsave('3-outputs/shap_beeswarm.png', width=8, height=8)
+ggsave(here::here('3-outputs','shap_beeswarm.png'), width=8, height=8)
 
 # Zoom in on individual features to see the non-linearities
 sv_dependence(shap, v = c("neighbour_detections","tot_population","detections","med_income"))
 
 # Examine top interactions between two features
 sv_dependence(shap, v = 'year', interactions=T)
-ggsave('3-outputs/shap_interaction.png', width=8, height=6)
+ggsave(here::here('3-outputs','shap_interaction.png'), width=8, height=6)
