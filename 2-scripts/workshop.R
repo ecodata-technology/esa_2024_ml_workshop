@@ -28,14 +28,15 @@ census = pull_census_data()
 
 pest_agg = aggregate_pest_data(pest, counties)
 
-climate_agg = wrangle_prism(here::here('1-data','prism'), counties)
+climate_agg = wrangle_prism(counties)
 
 # Combine everything for all years and counties
 cleaned_dat = expand_grid(year = c(2014:2023), county = counties$county) %>%
   left_join(pest_agg) %>%
   left_join(climate_agg) %>%
   left_join(census)
-  
+
+rm(pest, census, pest_agg, climate_agg)
 
 
 #### 4. Feature engineering ####
@@ -57,6 +58,8 @@ final_dat = cleaned_dat %>%
   mutate(presence_t1 = lead(presence)) %>%
   ungroup() %>%
   filter(year < 2023)
+
+rm(cleaned_dat)
 
 # Final data has been prepared just in case of issues running prior code during the workshop
 # final_dat = read.csv(here::here('1-data','finaldat.csv'))

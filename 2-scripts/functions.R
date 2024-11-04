@@ -114,7 +114,7 @@ aggregate_pest_data <- function(pests, polygons) {
 # b. Map PRISM raster to county polygons with zonal statistics from exactextractr package
 
 # Due to how PRISM data is structured we have to process each year-variable combination separately and collate the results
-wrangle_prism <- function(prism_directory, counties) {
+wrangle_prism <- function(counties) {
   
   datasets = expand_grid(year = c(2014:2022), var = c('ppt', 'tmin', 'tmax'))
   
@@ -126,8 +126,7 @@ wrangle_prism <- function(prism_directory, counties) {
     year = datasets$year[i]
     
     # Open the subdir
-    dir = paste0("1-data/prism/",var)
-    prism_set_dl_dir(dir)
+    prism_set_dl_dir(here::here('1-data','prism',var))
     
     # Fetch the raster
     temp_raster = prism_archive_subset(type=var,temp_period='annual',years=year) %>% pd_stack()
