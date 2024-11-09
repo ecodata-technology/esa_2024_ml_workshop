@@ -68,7 +68,7 @@ rm(cleaned_dat)
 
 # a. Setup, load ML libraries and set aside data to predict on with fitted model
 
-pacman::p_load(tidymodels, parsnip, finetune, parallel, doParallel, magrittr)
+pacman::p_load(tidymodels, parsnip, xgboost, finetune, parallel, doParallel, magrittr)
 
 set.seed(42)
 
@@ -152,14 +152,13 @@ xgboost_grid = dials::grid_max_entropy(
 # Specify 5-fold cross validation
 cv_folds = vfold_cv(training(dat_split),v=5)
 
-# Run with ANOVA racing to speed things up
-xgb_tuned = finetune::tune_race_anova(
+# Execute hyperparameter tuning
+xgb_tuned = tune::tune_grid(
   object=xgb_workflow,
   resamples = cv_folds,
   grid = xgboost_grid,
   # https://yardstick.tidymodels.org/articles/metric-types.html
-  metrics = yardstick::metric_set(roc_auc, pr_auc, f_meas, kap),
-  control = control_race(verbose_elim = TRUE)
+  metrics = yardstick::metric_set(roc_auc, pr_auc, f_meas, kap)
 )
 
 
@@ -261,8 +260,8 @@ shap = shapviz(xgb_obj,
                X_pred = bake(prep(recipe), has_role("predictor"), new_data = final_dat, composition = "matrix"),
                X = bake(prep(recipe), has_role("predictor"), new_data = final_dat),
                
-               # VERY slow to crunch for bigger datasets
-               interactions = T
+               # VERY slow to crunch for bigger datasets, omit for now
+               interactions = F
                )
 
 # Waterfall plots to interrogate individual observations
@@ -278,7 +277,3 @@ ggsave(here::here('3-outputs','shap_beeswarm.png'), width=8, height=8)
 
 # Zoom in on individual features to see the non-linearities
 sv_dependence(shap, v = c("neighbour_detections","tot_population","detections","med_income"))
-
-# Examine top interactions between two features
-sv_dependence(shap, v = 'year', interactions=T)
-ggsave(here::here('3-outputs','shap_interaction.png'), width=8, height=6)
