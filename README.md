@@ -5,6 +5,18 @@ This repository contains the scripts and data for the end-to-end ML workshop. Sl
 
 Repo for the prior cloud workshop [can be found here](https://github.com/ecodata-technology/entsoc-2024-cloud-workshop).
 
+
+## Log in
+
+Log into [AWS console](https://440377999911.signin.aws.amazon.com/console) and use the following credentials:
+
+AWS Account #: 440377999911
+
+IAM username: mlUser0 (1,2,3, ..., 149)
+
+Password: ask Alex
+
+
 ## Repo structure
 
 - **1-data**: Contains some raw and compiled data for the workshop, largely to avoid IP throttling from certain data sources.
